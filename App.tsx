@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import { NavigationContainer } from '@react-navigation/native';
 import { createStackNavigator } from '@react-navigation/stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
@@ -12,6 +12,8 @@ import {
   FlatList,
   Alert,
   StatusBar,
+  RefreshControl,
+  ActivityIndicator,
 } from 'react-native';
 
 // ============ SPLASH SCREEN ============
@@ -35,31 +37,39 @@ const SplashScreen = ({ navigation }: any) => {
   );
 };
 
-// ============ LOGIN SCREEN ============
-// Danh sách sinh viên
-const usersData = [
-  { id: 1, mssv: '24810014', password: '123456', ho_ten: 'Trần Phan Tấn Phúc', lop: '241280301', khoa: 'Công nghệ Thông tin', email: '24810014@student.hcmute.edu.vn' },
-  { id: 2, mssv: '24810008', password: '123456', ho_ten: 'Nguyễn Giang Thái Khang', lop: '241280301', khoa: 'Công nghệ Thông tin', email: '24810008@student.hcmute.edu.vn' },
-  { id: 3, mssv: '24810002', password: '123456', ho_ten: 'Hồ Vũ Hoàng Anh', lop: '241280301', khoa: 'Công nghệ Thông tin', email: '24810002@student.hcmute.edu.vn' },
-];
+// ============ FIREBASE IMPORTS ============
+import { getStudents } from './src/firebase';
 
+// ============ LOGIN SCREEN ============
 const LoginScreen = ({ navigation }: any) => {
   const [mssv, setMssv] = useState('');
   const [password, setPassword] = useState('');
+  const [loading, setLoading] = useState(false);
 
-  const handleLogin = () => {
+  const handleLogin = async () => {
     if (!mssv.trim() || !password.trim()) {
       Alert.alert('Lỗi', 'Vui lòng nhập MSSV và mật khẩu');
       return;
     }
 
-    // Tìm user trong danh sách
-    const user = usersData.find(u => u.mssv === mssv.trim() && u.password === password);
+    setLoading(true);
+    try {
+      // Lấy danh sách sinh viên từ Firebase
+      const students = await getStudents();
 
-    if (user) {
-      navigation.replace('Main', { user });
-    } else {
-      Alert.alert('Lỗi', 'MSSV hoặc mật khẩu không đúng');
+      // Tìm user trong danh sách
+      const user = students.find((u: any) => u.mssv === mssv.trim() && u.password === password);
+
+      if (user) {
+        navigation.replace('Main', { user });
+      } else {
+        Alert.alert('Lỗi', 'MSSV hoặc mật khẩu không đúng');
+      }
+    } catch (error) {
+      Alert.alert('Lỗi', 'Không thể kết nối đến server. Vui lòng thử lại.');
+      console.error(error);
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -89,41 +99,169 @@ const LoginScreen = ({ navigation }: any) => {
           onChangeText={setPassword}
           secureTextEntry
         />
-        <TouchableOpacity style={styles.loginButton} onPress={handleLogin}>
-          <Text style={styles.loginButtonText}>ĐĂNG NHẬP</Text>
+        <TouchableOpacity
+          style={[styles.loginButton, loading && { opacity: 0.7 }]}
+          onPress={handleLogin}
+          disabled={loading}
+        >
+          <Text style={styles.loginButtonText}>
+            {loading ? 'ĐANG ĐĂNG NHẬP...' : 'ĐĂNG NHẬP'}
+          </Text>
         </TouchableOpacity>
-        <Text style={styles.hint}>Demo: 24810014 / 24810008 / 24810002 (MK: 123456)</Text>
+        <Text style={styles.hint}>🔥 Đồng bộ Firebase - Thêm SV từ Admin Web</Text>
       </View>
     </View>
   );
 };
 
-// ============ ANNOUNCEMENTS DATA ============
-const announcementsData = [
-  { id: '1', title: 'Thông báo về lịch thi kiểm tra trình độ tiếng Anh đầu ra đợt thi tháng 01/2025', sender: 'PDT_Phạm Thị Thùy Hạnh', date: '31/12/2025' },
-  { id: '2', title: 'Thông báo chương trình Lễ tốt nghiệp tháng 01/2025', sender: 'PDT_Bùi Thị Quỳnh', date: '26/12/2025' },
-  { id: '3', title: 'Thông báo Về việc nhận bằng tốt nghiệp Đại học hệ chính quy', sender: 'PDT_Bùi Thị Quỳnh', date: '17/11/2025' },
-  { id: '4', title: 'Thông báo lịch thi kiểm tra trình độ tiếng Anh đầu ra đợt thi tháng 01/2025', sender: 'PDT_Phạm Thị Thùy Hạnh', date: '12/12/2025' },
-  { id: '5', title: 'Thông báo v/v đăng ký thi kiểm tra trình độ tiếng Anh đầu ra', sender: 'PDT_Phạm Thị Thùy Hạnh', date: '12/12/2025' },
+// ============ MOCK API & DATA ============
+const MOCK_ANNOUNCEMENTS = [
+  {
+    id: '1',
+    title: 'Thông báo về lịch thi kiểm tra trình độ tiếng Anh đầu ra đợt thi tháng 01/2025',
+    sender: 'PDT_Phạm Thị Thùy Hạnh',
+    date: '31/12/2025',
+    type: 'chung',
+    created_at: '2025-12-31T08:00:00',
+    content: 'Phòng Đào tạo thông báo lịch thi kiểm tra trình độ tiếng Anh đầu ra đợt thi tháng 01/2025 như sau:\n\n- Thời gian thi: 15/01/2025\n- Địa điểm: Hội trường A\n- Thí sinh có mặt trước 30 phút\n\nĐề nghị các sinh viên đăng ký thi đúng thời hạn.'
+  },
+  {
+    id: '2',
+    title: 'Thông báo chương trình Lễ tốt nghiệp tháng 01/2025',
+    sender: 'PDT_Bùi Thị Quỳnh',
+    date: '26/12/2025',
+    type: 'chung',
+    created_at: '2025-12-26T09:30:00',
+    content: 'Trường Đại học Sư phạm Kỹ thuật TP.HCM thông báo chương trình Lễ tốt nghiệp tháng 01/2025:\n\n- Thời gian: 20/01/2025, 8h00\n- Địa điểm: Nhà thi đấu đa năng\n\nSinh viên tốt nghiệp vui lòng đăng ký nhận bằng tại Phòng Đào tạo.'
+  },
+  {
+    id: '3',
+    title: 'Thông báo Về việc nhận bằng tốt nghiệp Đại học hệ chính quy',
+    sender: 'PDT_Bùi Thị Quỳnh',
+    date: '17/11/2025',
+    type: 'chung',
+    created_at: '2025-11-17T10:00:00',
+    content: 'Phòng Đào tạo thông báo về việc nhận bằng tốt nghiệp Đại học hệ chính quy:\n\n- Thời gian: Từ 01/12/2025\n- Địa điểm: Phòng Đào tạo (A1.101)\n- Giờ làm việc: 8h00 - 11h00 và 14h00 - 16h30\n\nSinh viên mang theo CMND/CCCD khi nhận bằng.'
+  },
+  {
+    id: '4',
+    title: 'Thông báo lịch thi kiểm tra trình độ tiếng Anh đầu ra đợt thi tháng 01/2025',
+    sender: 'PDT_Phạm Thị Thùy Hạnh',
+    date: '12/12/2025',
+    type: 'chung',
+    created_at: '2025-12-12T14:00:00',
+    content: 'Phòng Đào tạo thông báo lịch thi chi tiết:\n\n- Ca 1: 7h30 - 9h30\n- Ca 2: 10h00 - 12h00\n- Ca 3: 14h00 - 16h00\n\nSinh viên xem ca thi tại website trường.'
+  },
+  {
+    id: '5',
+    title: 'Thông báo v/v đăng ký thi kiểm tra trình độ tiếng Anh đầu ra',
+    sender: 'PDT_Phạm Thị Thùy Hạnh',
+    date: '12/12/2025',
+    type: 'chung',
+    created_at: '2025-12-12T08:00:00',
+    content: 'Sinh viên đăng ký thi kiểm tra trình độ tiếng Anh đầu ra theo hướng dẫn sau:\n\n1. Đăng nhập hệ thống\n2. Chọn đợt thi phù hợp\n3. Xác nhận đăng ký\n\nHạn đăng ký: 25/12/2025.'
+  },
+  {
+    id: '6',
+    title: 'Thông báo về việc nộp học phí học kỳ 2 năm học 2025-2026',
+    sender: 'Phòng Kế hoạch Tài chính',
+    date: '08/01/2026',
+    type: 'ca_nhan',
+    created_at: '2026-01-08T09:00:00',
+    content: 'Kính gửi sinh viên,\n\nPhòng Kế hoạch Tài chính thông báo thời hạn nộp học phí HK2 năm học 2025-2026:\n\n- Hạn nộp: 31/01/2026\n- Học phí: 13.000.000 VNĐ\n\nSinh viên nộp qua ngân hàng hoặc cổng thanh toán online.'
+  },
+  {
+    id: '7',
+    title: 'Nhắc nhở: Đăng ký học phần học kỳ 2',
+    sender: 'PDT_Nguyễn Văn A',
+    date: '05/01/2026',
+    type: 'ca_nhan',
+    created_at: '2026-01-05T08:00:00',
+    content: 'Nhắc nhở sinh viên đăng ký học phần HK2 năm học 2025-2026:\n\n- Thời gian đăng ký: 05/01 - 15/01/2026\n- Sinh viên đăng nhập hệ thống để đăng ký\n\nLưu ý: Sau thời hạn trên, sinh viên sẽ không được đăng ký bổ sung.'
+  },
 ];
 
+// Simulate fetching from API - Now uses Firebase!
+import { getAnnouncements } from './src/firebase';
+
+const fetchAnnouncements = async (): Promise<typeof MOCK_ANNOUNCEMENTS> => {
+  try {
+    const data = await getAnnouncements();
+    return (data.length > 0 ? data : MOCK_ANNOUNCEMENTS) as typeof MOCK_ANNOUNCEMENTS;
+  } catch (error) {
+    console.log('Firebase fetch failed, using mock data');
+    return MOCK_ANNOUNCEMENTS;
+  }
+};
+
 // ============ ANNOUNCEMENTS SCREEN ============
-const AnnouncementsScreen = () => {
+const AnnouncementsScreen = ({ navigation }: any) => {
   const [searchText, setSearchText] = useState('');
   const [activeTab, setActiveTab] = useState('chung');
+  const [refreshing, setRefreshing] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [announcements, setAnnouncements] = useState<typeof MOCK_ANNOUNCEMENTS>([]);
+  const [error, setError] = useState<string | null>(null);
 
-  const filteredData = announcementsData.filter(item =>
-    item.title.toLowerCase().includes(searchText.toLowerCase())
-  );
+  // Fetch data on mount
+  useEffect(() => {
+    loadData();
+  }, []);
+
+  const loadData = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      const data = await fetchAnnouncements();
+      setAnnouncements(data);
+    } catch (err: any) {
+      setError(err.message || 'Đã xảy ra lỗi');
+      Alert.alert('Lỗi', 'Không thể tải dữ liệu. Vui lòng kiểm tra kết nối mạng.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true);
+    try {
+      const data = await fetchAnnouncements();
+      setAnnouncements(data);
+      setError(null);
+    } catch (err: any) {
+      setError(err.message);
+    } finally {
+      setRefreshing(false);
+    }
+  }, []);
+
+  const filteredData = announcements
+    .filter(item => item.type === activeTab)
+    .filter(item => item.title.toLowerCase().includes(searchText.toLowerCase()));
 
   const renderItem = ({ item }: any) => (
-    <TouchableOpacity style={styles.card}>
-      <Text style={styles.cardTitle}>{item.title}</Text>
-      <View style={styles.cardMeta}>
-        <Text style={styles.cardSender}>{item.sender}</Text>
-        <Text style={styles.cardDate}>{item.date}</Text>
+    <TouchableOpacity
+      style={styles.card}
+      onPress={() => navigation.navigate('AnnouncementDetail', { announcement: item })}
+    >
+      <View style={styles.cardIcon}>
+        <Text style={{ fontSize: 24 }}>📋</Text>
+      </View>
+      <View style={styles.cardContent}>
+        <Text style={styles.cardTitle} numberOfLines={2}>{item.title}</Text>
+        <View style={styles.cardMeta}>
+          <Text style={styles.cardSender}>👤 {item.sender}</Text>
+          <Text style={styles.cardDate}>📅 {item.date}</Text>
+        </View>
       </View>
     </TouchableOpacity>
+  );
+
+  const renderEmpty = () => (
+    <View style={styles.emptyContainer}>
+      <Text style={{ fontSize: 48 }}>📭</Text>
+      <Text style={styles.emptyText}>Không có thông báo nào</Text>
+    </View>
   );
 
   return (
@@ -152,14 +290,68 @@ const AnnouncementsScreen = () => {
         placeholder="🔍 Tìm kiếm thông báo..."
         value={searchText}
         onChangeText={setSearchText}
+        placeholderTextColor="#999"
       />
-      <FlatList
-        data={filteredData}
-        renderItem={renderItem}
-        keyExtractor={(item) => item.id}
-        contentContainerStyle={styles.listContainer}
-      />
+      {loading ? (
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color="#003366" />
+          <Text style={styles.loadingText}>Đang tải...</Text>
+        </View>
+      ) : error ? (
+        <View style={styles.errorContainer}>
+          <Text style={{ fontSize: 48 }}>⚠️</Text>
+          <Text style={styles.errorText}>{error}</Text>
+          <TouchableOpacity style={styles.retryButton} onPress={loadData}>
+            <Text style={styles.retryButtonText}>🔄 Thử lại</Text>
+          </TouchableOpacity>
+        </View>
+      ) : (
+        <FlatList
+          data={filteredData}
+          renderItem={renderItem}
+          keyExtractor={(item) => item.id}
+          contentContainerStyle={styles.listContainer}
+          ListEmptyComponent={renderEmpty}
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={onRefresh}
+              colors={['#003366']}
+              tintColor="#003366"
+            />
+          }
+        />
+      )}
     </View>
+  );
+};
+
+// ============ ANNOUNCEMENT DETAIL SCREEN ============
+const AnnouncementDetailScreen = ({ route }: any) => {
+  const { announcement } = route.params;
+
+  const formatDate = (dateString: string) => {
+    const date = new Date(dateString);
+    return `${date.getDate().toString().padStart(2, '0')}/${(date.getMonth() + 1).toString().padStart(2, '0')}/${date.getFullYear()} ${date.getHours().toString().padStart(2, '0')}:${date.getMinutes().toString().padStart(2, '0')}`;
+  };
+
+  return (
+    <ScrollView style={styles.screenContainer}>
+      <View style={styles.detailHeader}>
+        <Text style={styles.detailTitle}>{announcement.title}</Text>
+        <View style={styles.detailMeta}>
+          <Text style={styles.detailMetaItem}>👤 {announcement.sender}</Text>
+          <Text style={styles.detailMetaItem}>📅 {formatDate(announcement.created_at)}</Text>
+          <Text style={styles.detailMetaItem}>
+            {announcement.type === 'ca_nhan' ? '🔒 Thông báo cá nhân' : '🌐 Thông báo chung'}
+          </Text>
+        </View>
+      </View>
+      <View style={styles.detailContent}>
+        <Text style={styles.detailContentLabel}>Nội dung:</Text>
+        <Text style={styles.detailContentText}>{announcement.content}</Text>
+      </View>
+    </ScrollView>
   );
 };
 
@@ -204,25 +396,39 @@ const scheduleData = [
   { id: '6', day: 'Thứ 6', subject: 'Thương mại điện tử', room: 'A2-301', time: 'Tiết 4-6' },
 ];
 
-const ScheduleScreen = () => (
-  <ScrollView style={styles.screenContainer}>
-    <View style={styles.headerBar}>
-      <Text style={styles.headerTitle}>📅 THỜI KHÓA BIỂU</Text>
-    </View>
-    <Text style={styles.semesterInfo}>Học kỳ 2 - Năm học 2025-2026</Text>
-    {scheduleData.map((item) => (
-      <View key={item.id} style={styles.scheduleCard}>
-        <View style={styles.scheduleDay}>
-          <Text style={styles.scheduleDayText}>{item.day}</Text>
-        </View>
-        <View style={styles.scheduleInfo}>
-          <Text style={styles.scheduleSubject}>{item.subject}</Text>
-          <Text style={styles.scheduleDetail}>📍 {item.room} | ⏰ {item.time}</Text>
-        </View>
+const ScheduleScreen = () => {
+  const [refreshing, setRefreshing] = useState(false);
+
+  const onRefresh = useCallback(() => {
+    setRefreshing(true);
+    setTimeout(() => setRefreshing(false), 1000);
+  }, []);
+
+  return (
+    <ScrollView
+      style={styles.screenContainer}
+      refreshControl={
+        <RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={['#003366']} />
+      }
+    >
+      <View style={styles.headerBar}>
+        <Text style={styles.headerTitle}>📅 THỜI KHÓA BIỂU</Text>
       </View>
-    ))}
-  </ScrollView>
-);
+      <Text style={styles.semesterInfo}>Học kỳ 2 - Năm học 2025-2026</Text>
+      {scheduleData.map((item) => (
+        <View key={item.id} style={styles.scheduleCard}>
+          <View style={styles.scheduleDay}>
+            <Text style={styles.scheduleDayText}>{item.day}</Text>
+          </View>
+          <View style={styles.scheduleInfo}>
+            <Text style={styles.scheduleSubject}>{item.subject}</Text>
+            <Text style={styles.scheduleDetail}>📍 {item.room} | ⏰ {item.time}</Text>
+          </View>
+        </View>
+      ))}
+    </ScrollView>
+  );
+};
 
 // ============ GRADES SCREEN ============
 const gradesData = [
@@ -235,10 +441,21 @@ const gradesData = [
 ];
 
 const GradesScreen = () => {
+  const [refreshing, setRefreshing] = useState(false);
   const gpa = (gradesData.reduce((sum, g) => sum + g.score, 0) / gradesData.length).toFixed(2);
 
+  const onRefresh = useCallback(() => {
+    setRefreshing(true);
+    setTimeout(() => setRefreshing(false), 1000);
+  }, []);
+
   return (
-    <ScrollView style={styles.screenContainer}>
+    <ScrollView
+      style={styles.screenContainer}
+      refreshControl={
+        <RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={['#003366']} />
+      }
+    >
       <View style={styles.headerBar}>
         <Text style={styles.headerTitle}>📊 BẢNG ĐIỂM</Text>
       </View>
@@ -264,8 +481,517 @@ const GradesScreen = () => {
   );
 };
 
-// ============ TAB NAVIGATOR ============
+// ============ EXAM SCHEDULE SCREEN ============
+const examData = [
+  { id: '1', subject: 'Lập trình di động', date: '15/01/2026', time: '07:30 - 09:30', room: 'A1-301', type: 'Cuối kỳ' },
+  { id: '2', subject: 'Cơ sở dữ liệu', date: '17/01/2026', time: '13:00 - 15:00', room: 'A2-201', type: 'Cuối kỳ' },
+  { id: '3', subject: 'Mạng máy tính', date: '19/01/2026', time: '07:30 - 09:30', room: 'B1-101', type: 'Cuối kỳ' },
+  { id: '4', subject: 'Trí tuệ nhân tạo', date: '21/01/2026', time: '13:00 - 15:00', room: 'A3-401', type: 'Cuối kỳ' },
+  { id: '5', subject: 'Thương mại điện tử', date: '23/01/2026', time: '07:30 - 09:30', room: 'A2-301', type: 'Cuối kỳ' },
+];
+
+const ExamScheduleScreen = () => {
+  const [refreshing, setRefreshing] = useState(false);
+
+  const onRefresh = useCallback(() => {
+    setRefreshing(true);
+    setTimeout(() => setRefreshing(false), 1000);
+  }, []);
+
+  return (
+    <ScrollView
+      style={styles.screenContainer}
+      refreshControl={
+        <RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={['#003366']} />
+      }
+    >
+      <View style={styles.headerBar}>
+        <Text style={styles.headerTitle}>📝 LỊCH THI</Text>
+      </View>
+      <Text style={styles.semesterInfo}>Học kỳ 2 - Năm học 2025-2026</Text>
+      {examData.map((item) => (
+        <View key={item.id} style={styles.examCard}>
+          <View style={styles.examHeader}>
+            <Text style={styles.examSubject}>{item.subject}</Text>
+            <View style={styles.examBadge}>
+              <Text style={styles.examBadgeText}>{item.type}</Text>
+            </View>
+          </View>
+          <View style={styles.examDetails}>
+            <Text style={styles.examDetail}>📅 {item.date}</Text>
+            <Text style={styles.examDetail}>⏰ {item.time}</Text>
+            <Text style={styles.examDetail}>📍 {item.room}</Text>
+          </View>
+        </View>
+      ))}
+    </ScrollView>
+  );
+};
+
+// ============ DASHBOARD SCREEN ============
+const DashboardScreen = ({ route, navigation }: any) => {
+  const user = route.params?.user || {};
+  const gpa = (gradesData.reduce((sum, g) => sum + g.score, 0) / gradesData.length).toFixed(2);
+
+  const handleLogout = () => {
+    Alert.alert(
+      'Đăng xuất',
+      'Bạn có chắc chắn muốn đăng xuất?',
+      [
+        { text: 'Hủy', style: 'cancel' },
+        {
+          text: 'Đăng xuất',
+          style: 'destructive',
+          onPress: () => navigation.reset({
+            index: 0,
+            routes: [{ name: 'Login' }],
+          }),
+        },
+      ]
+    );
+  };
+
+  return (
+    <ScrollView style={styles.screenContainer}>
+      <View style={styles.dashboardHeader}>
+        <View style={styles.dashboardTopRow}>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.dashboardWelcome}>Xin chào,</Text>
+            <Text style={styles.dashboardName}>{user.ho_ten || 'Sinh viên'}</Text>
+            <Text style={styles.dashboardMssv}>MSSV: {user.mssv || '---'}</Text>
+          </View>
+          <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
+            <Text style={styles.logoutButtonText}>🚪 Đăng xuất</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+
+      <View style={styles.statsContainer}>
+        <View style={styles.statCard}>
+          <Text style={styles.statNumber}>5</Text>
+          <Text style={styles.statLabel}>Thông báo mới</Text>
+        </View>
+        <View style={styles.statCard}>
+          <Text style={styles.statNumber}>{gpa}</Text>
+          <Text style={styles.statLabel}>GPA</Text>
+        </View>
+        <View style={styles.statCard}>
+          <Text style={styles.statNumber}>6</Text>
+          <Text style={styles.statLabel}>Môn học</Text>
+        </View>
+      </View>
+
+      <Text style={styles.sectionTitle}>⚡ Truy cập nhanh</Text>
+      <View style={styles.quickLinks}>
+        <TouchableOpacity style={styles.quickLink} onPress={() => navigation.navigate('Thông báo')}>
+          <Text style={styles.quickLinkIcon}>📢</Text>
+          <Text style={styles.quickLinkText}>Thông báo</Text>
+        </TouchableOpacity>
+        <TouchableOpacity style={styles.quickLink} onPress={() => navigation.navigate('Thời khóa biểu')}>
+          <Text style={styles.quickLinkIcon}>📅</Text>
+          <Text style={styles.quickLinkText}>Lịch học</Text>
+        </TouchableOpacity>
+        <TouchableOpacity style={styles.quickLink} onPress={() => navigation.navigate('Xem điểm')}>
+          <Text style={styles.quickLinkIcon}>📊</Text>
+          <Text style={styles.quickLinkText}>Điểm</Text>
+        </TouchableOpacity>
+        <TouchableOpacity style={styles.quickLink} onPress={() => navigation.navigate('Lịch thi')}>
+          <Text style={styles.quickLinkIcon}>📝</Text>
+          <Text style={styles.quickLinkText}>Lịch thi</Text>
+        </TouchableOpacity>
+      </View>
+
+      <Text style={styles.sectionTitle}>⚙️ Cài đặt</Text>
+      <View style={styles.settingsContainer}>
+        <TouchableOpacity style={styles.settingsItem} onPress={() => navigation.navigate('Profile', { user })}>
+          <Text style={styles.settingsIcon}>👤</Text>
+          <Text style={styles.settingsText}>Thông tin cá nhân</Text>
+          <Text style={styles.settingsArrow}>›</Text>
+        </TouchableOpacity>
+        <TouchableOpacity style={styles.settingsItem} onPress={() => navigation.navigate('Thông báo')}>
+          <Text style={styles.settingsIcon}>🔔</Text>
+          <Text style={styles.settingsText}>Thông báo</Text>
+          <Text style={styles.settingsArrow}>›</Text>
+        </TouchableOpacity>
+        <TouchableOpacity style={styles.settingsItem} onPress={() => Alert.alert('Đổi mật khẩu', 'Tính năng đang phát triển')}>
+          <Text style={styles.settingsIcon}>🔒</Text>
+          <Text style={styles.settingsText}>Đổi mật khẩu</Text>
+          <Text style={styles.settingsArrow}>›</Text>
+        </TouchableOpacity>
+        <TouchableOpacity style={styles.settingsItem}>
+          <Text style={styles.settingsIcon}>ℹ️</Text>
+          <Text style={styles.settingsText}>Về ứng dụng</Text>
+          <Text style={styles.settingsArrow}>›</Text>
+        </TouchableOpacity>
+      </View>
+    </ScrollView>
+  );
+};
+
+// ============ TUITION SCREEN ============
+const TuitionScreen = () => (
+  <ScrollView style={styles.screenContainer}>
+    <View style={styles.headerBar}>
+      <Text style={styles.headerTitle}>💰 THANH TOÁN HỌC PHÍ</Text>
+    </View>
+
+    <View style={styles.tuitionCard}>
+      <Text style={styles.tuitionSemester}>Học kỳ 2 - Năm học 2025-2026</Text>
+      <View style={styles.tuitionRow}>
+        <Text style={styles.tuitionLabel}>Học phí:</Text>
+        <Text style={styles.tuitionValue}>12,500,000 VNĐ</Text>
+      </View>
+      <View style={styles.tuitionRow}>
+        <Text style={styles.tuitionLabel}>Bảo hiểm:</Text>
+        <Text style={styles.tuitionValue}>500,000 VNĐ</Text>
+      </View>
+      <View style={styles.tuitionDivider} />
+      <View style={styles.tuitionRow}>
+        <Text style={styles.tuitionLabelBold}>Tổng cộng:</Text>
+        <Text style={styles.tuitionValueBold}>13,000,000 VNĐ</Text>
+      </View>
+      <View style={[styles.tuitionStatus, { backgroundColor: '#4CAF50' }]}>
+        <Text style={styles.tuitionStatusText}>✅ ĐÃ THANH TOÁN</Text>
+      </View>
+    </View>
+
+    <View style={styles.tuitionCard}>
+      <Text style={styles.tuitionSemester}>Học kỳ 1 - Năm học 2025-2026</Text>
+      <View style={styles.tuitionRow}>
+        <Text style={styles.tuitionLabelBold}>Tổng cộng:</Text>
+        <Text style={styles.tuitionValueBold}>12,800,000 VNĐ</Text>
+      </View>
+      <View style={[styles.tuitionStatus, { backgroundColor: '#4CAF50' }]}>
+        <Text style={styles.tuitionStatusText}>✅ ĐÃ THANH TOÁN</Text>
+      </View>
+    </View>
+  </ScrollView>
+);
+
+// ============ TRAINING POINTS SCREEN ============
+const trainingPointsData = [
+  { id: '1', semester: 'HK2 2025-2026', points: 85, rank: 'Tốt' },
+  { id: '2', semester: 'HK1 2025-2026', points: 90, rank: 'Xuất sắc' },
+  { id: '3', semester: 'HK2 2024-2025', points: 82, rank: 'Tốt' },
+  { id: '4', semester: 'HK1 2024-2025', points: 88, rank: 'Tốt' },
+];
+
+const TrainingPointsScreen = () => (
+  <ScrollView style={styles.screenContainer}>
+    <View style={styles.headerBar}>
+      <Text style={styles.headerTitle}>🎓 ĐIỂM RÈN LUYỆN</Text>
+    </View>
+
+    <View style={styles.trainingAvg}>
+      <Text style={styles.trainingAvgLabel}>Điểm trung bình rèn luyện</Text>
+      <Text style={styles.trainingAvgValue}>86.25</Text>
+      <Text style={styles.trainingAvgRank}>Xếp loại: TỐT</Text>
+    </View>
+
+    {trainingPointsData.map((item) => (
+      <View key={item.id} style={styles.trainingCard}>
+        <View style={styles.trainingInfo}>
+          <Text style={styles.trainingSemester}>{item.semester}</Text>
+          <Text style={styles.trainingRank}>{item.rank}</Text>
+        </View>
+        <View style={styles.trainingScore}>
+          <Text style={styles.trainingPoints}>{item.points}</Text>
+          <Text style={styles.trainingMax}>/100</Text>
+        </View>
+      </View>
+    ))}
+  </ScrollView>
+);
+
+// ============ CURRICULUM SCREEN ============
+const curriculumData = [
+  { semester: 'Học kỳ 1', subjects: ['Nhập môn lập trình', 'Toán cao cấp 1', 'Vật lý đại cương', 'Tiếng Anh 1'], credits: 15 },
+  { semester: 'Học kỳ 2', subjects: ['Lập trình hướng đối tượng', 'Toán cao cấp 2', 'Cấu trúc dữ liệu', 'Tiếng Anh 2'], credits: 16 },
+  { semester: 'Học kỳ 3', subjects: ['Cơ sở dữ liệu', 'Mạng máy tính', 'Hệ điều hành', 'Lập trình Web'], credits: 18 },
+  { semester: 'Học kỳ 4', subjects: ['Lập trình di động', 'Trí tuệ nhân tạo', 'An toàn thông tin', 'Thương mại điện tử'], credits: 17 },
+];
+
+const CurriculumScreen = () => (
+  <ScrollView style={styles.screenContainer}>
+    <View style={styles.headerBar}>
+      <Text style={styles.headerTitle}>📚 CHƯƠNG TRÌNH ĐÀO TẠO</Text>
+    </View>
+
+    <View style={styles.curriculumSummary}>
+      <Text style={styles.curriculumTotal}>Tổng tín chỉ tích lũy: 66/140</Text>
+      <View style={styles.progressBar}>
+        <View style={[styles.progressFill, { width: '47%' }]} />
+      </View>
+      <Text style={styles.curriculumPercent}>47% hoàn thành</Text>
+    </View>
+
+    {curriculumData.map((item, index) => (
+      <View key={index} style={styles.curriculumCard}>
+        <View style={styles.curriculumHeader}>
+          <Text style={styles.curriculumSemester}>{item.semester}</Text>
+          <Text style={styles.curriculumCredits}>{item.credits} TC</Text>
+        </View>
+        {item.subjects.map((subject, idx) => (
+          <Text key={idx} style={styles.curriculumSubject}>• {subject}</Text>
+        ))}
+      </View>
+    ))}
+  </ScrollView>
+);
+
+// ============ ATTENDANCE SCREEN (Chuyển cần) ============
+const attendanceData = [
+  { id: '1', subject: 'Lập trình di động', total: 15, attended: 14, absent: 1, percent: 93 },
+  { id: '2', subject: 'Cơ sở dữ liệu', total: 15, attended: 15, absent: 0, percent: 100 },
+  { id: '3', subject: 'Mạng máy tính', total: 12, attended: 11, absent: 1, percent: 92 },
+  { id: '4', subject: 'Trí tuệ nhân tạo', total: 10, attended: 10, absent: 0, percent: 100 },
+  { id: '5', subject: 'Thương mại điện tử', total: 8, attended: 7, absent: 1, percent: 88 },
+];
+
+const AttendanceScreen = () => (
+  <ScrollView style={styles.screenContainer}>
+    <View style={styles.headerBar}>
+      <Text style={styles.headerTitle}>✅ CHUYỂN CẦN (ĐIỂM DANH)</Text>
+    </View>
+    <Text style={styles.semesterInfo}>Học kỳ 2 - Năm học 2025-2026</Text>
+
+    {attendanceData.map((item) => (
+      <View key={item.id} style={styles.attendanceCard}>
+        <Text style={styles.attendanceSubject}>{item.subject}</Text>
+        <View style={styles.attendanceStats}>
+          <View style={styles.attendanceStat}>
+            <Text style={styles.attendanceNumber}>{item.attended}</Text>
+            <Text style={styles.attendanceLabel}>Có mặt</Text>
+          </View>
+          <View style={styles.attendanceStat}>
+            <Text style={[styles.attendanceNumber, { color: '#e74c3c' }]}>{item.absent}</Text>
+            <Text style={styles.attendanceLabel}>Vắng</Text>
+          </View>
+          <View style={styles.attendanceStat}>
+            <Text style={[styles.attendanceNumber, { color: item.percent >= 80 ? '#4CAF50' : '#e74c3c' }]}>
+              {item.percent}%
+            </Text>
+            <Text style={styles.attendanceLabel}>Tỷ lệ</Text>
+          </View>
+        </View>
+        <View style={styles.attendanceProgress}>
+          <View style={[styles.attendanceProgressFill, { width: `${item.percent}%` }]} />
+        </View>
+      </View>
+    ))}
+  </ScrollView>
+);
+
+// ============ ENGLISH GRADES SCREEN ============
+const englishGradesData = [
+  { id: '1', type: 'TOEIC', score: 650, date: '15/06/2025', status: 'Đạt chuẩn đầu ra' },
+  { id: '2', type: 'Tiếng Anh 1', score: 8.5, date: 'HK1 2024-2025', status: 'Hoàn thành' },
+  { id: '3', type: 'Tiếng Anh 2', score: 8.0, date: 'HK2 2024-2025', status: 'Hoàn thành' },
+  { id: '4', type: 'Tiếng Anh 3', score: 7.5, date: 'HK1 2025-2026', status: 'Hoàn thành' },
+];
+
+const EnglishGradesScreen = () => (
+  <ScrollView style={styles.screenContainer}>
+    <View style={styles.headerBar}>
+      <Text style={styles.headerTitle}>🇬🇧 ĐIỂM ANH VĂN</Text>
+    </View>
+
+    <View style={styles.englishSummary}>
+      <Text style={styles.englishSummaryLabel}>Chuẩn đầu ra tiếng Anh</Text>
+      <Text style={styles.englishSummaryValue}>TOEIC 650 ✅</Text>
+      <Text style={styles.englishSummaryStatus}>Đã đạt chuẩn</Text>
+    </View>
+
+    {englishGradesData.map((item) => (
+      <View key={item.id} style={styles.englishCard}>
+        <View style={styles.englishInfo}>
+          <Text style={styles.englishType}>{item.type}</Text>
+          <Text style={styles.englishDate}>{item.date}</Text>
+        </View>
+        <View style={styles.englishScore}>
+          <Text style={styles.englishScoreText}>{item.score}</Text>
+          <Text style={styles.englishStatus}>{item.status}</Text>
+        </View>
+      </View>
+    ))}
+  </ScrollView>
+);
+
+// ============ COURSE REGISTRATION SCREEN ============
+const availableCourses = [
+  { id: '1', code: 'IT001', name: 'An toàn thông tin', credits: 3, slots: 45, registered: 32 },
+  { id: '2', code: 'IT002', name: 'Học máy', credits: 3, slots: 40, registered: 40 },
+  { id: '3', code: 'IT003', name: 'Xử lý ảnh số', credits: 3, slots: 35, registered: 28 },
+  { id: '4', code: 'IT004', name: 'IoT và ứng dụng', credits: 2, slots: 30, registered: 25 },
+];
+
+const CourseRegistrationScreen = () => {
+  const [selectedCourses, setSelectedCourses] = useState<string[]>([]);
+
+  const toggleCourse = (id: string) => {
+    if (selectedCourses.includes(id)) {
+      setSelectedCourses(selectedCourses.filter(c => c !== id));
+    } else {
+      setSelectedCourses([...selectedCourses, id]);
+    }
+  };
+
+  return (
+    <ScrollView style={styles.screenContainer}>
+      <View style={styles.headerBar}>
+        <Text style={styles.headerTitle}>📝 ĐĂNG KÝ HỌC PHẦN</Text>
+      </View>
+
+      <View style={styles.regInfo}>
+        <Text style={styles.regInfoText}>Học kỳ 2 - Năm học 2025-2026</Text>
+        <Text style={styles.regInfoText}>Đã chọn: {selectedCourses.length} môn</Text>
+      </View>
+
+      {availableCourses.map((course) => (
+        <TouchableOpacity
+          key={course.id}
+          style={[styles.courseCard, selectedCourses.includes(course.id) && styles.courseCardSelected]}
+          onPress={() => toggleCourse(course.id)}
+        >
+          <View style={styles.courseCheckbox}>
+            <Text style={{ fontSize: 20 }}>{selectedCourses.includes(course.id) ? '☑️' : '⬜'}</Text>
+          </View>
+          <View style={styles.courseInfo}>
+            <Text style={styles.courseCode}>{course.code}</Text>
+            <Text style={styles.courseName}>{course.name}</Text>
+            <Text style={styles.courseDetails}>{course.credits} TC | {course.registered}/{course.slots} SV</Text>
+          </View>
+          <View style={[styles.courseStatus, { backgroundColor: course.registered >= course.slots ? '#e74c3c' : '#4CAF50' }]}>
+            <Text style={styles.courseStatusText}>{course.registered >= course.slots ? 'Hết chỗ' : 'Còn chỗ'}</Text>
+          </View>
+        </TouchableOpacity>
+      ))}
+
+      <TouchableOpacity style={styles.regButton}>
+        <Text style={styles.regButtonText}>XÁC NHẬN ĐĂNG KÝ</Text>
+      </TouchableOpacity>
+    </ScrollView>
+  );
+};
+
+// ============ GRADUATION CHECK SCREEN ============
+const GraduationScreen = () => (
+  <ScrollView style={styles.screenContainer}>
+    <View style={styles.headerBar}>
+      <Text style={styles.headerTitle}>🎓 XÉT TỐT NGHIỆP</Text>
+    </View>
+
+    <View style={styles.gradStatus}>
+      <Text style={{ fontSize: 48 }}>🎓</Text>
+      <Text style={styles.gradStatusTitle}>Trạng thái xét tốt nghiệp</Text>
+      <Text style={styles.gradStatusValue}>CHƯA ĐỦ ĐIỀU KIỆN</Text>
+    </View>
+
+    <View style={styles.gradChecklist}>
+      <Text style={styles.gradChecklistTitle}>📋 Điều kiện tốt nghiệp:</Text>
+
+      <View style={styles.gradCheckItem}>
+        <Text style={{ fontSize: 20 }}>✅</Text>
+        <Text style={styles.gradCheckText}>Hoàn thành 66/140 tín chỉ</Text>
+      </View>
+      <View style={styles.gradCheckItem}>
+        <Text style={{ fontSize: 20 }}>✅</Text>
+        <Text style={styles.gradCheckText}>GPA tích lũy: 8.05 (≥ 5.0)</Text>
+      </View>
+      <View style={styles.gradCheckItem}>
+        <Text style={{ fontSize: 20 }}>✅</Text>
+        <Text style={styles.gradCheckText}>Đạt chuẩn tiếng Anh (TOEIC 650)</Text>
+      </View>
+      <View style={styles.gradCheckItem}>
+        <Text style={{ fontSize: 20 }}>⏳</Text>
+        <Text style={styles.gradCheckText}>Hoàn thành ĐATN/Khóa luận</Text>
+      </View>
+      <View style={styles.gradCheckItem}>
+        <Text style={{ fontSize: 20 }}>⏳</Text>
+        <Text style={styles.gradCheckText}>Đóng đủ học phí</Text>
+      </View>
+    </View>
+  </ScrollView>
+);
+
+// ============ FORMS SCREEN ============
+const formsData = [
+  { id: '1', name: 'Đơn xin nghỉ học tạm thời', icon: '📄' },
+  { id: '2', name: 'Đơn xin chuyển ngành', icon: '🔄' },
+  { id: '3', name: 'Đơn xin cấp bảng điểm', icon: '📊' },
+  { id: '4', name: 'Đơn xin xác nhận sinh viên', icon: '📋' },
+  { id: '5', name: 'Đơn xin miễn giảm học phí', icon: '💰' },
+  { id: '6', name: 'Đơn xin hoãn thi', icon: '📝' },
+];
+
+const FormsScreen = () => (
+  <ScrollView style={styles.screenContainer}>
+    <View style={styles.headerBar}>
+      <Text style={styles.headerTitle}>📋 ĐĂNG KÝ MẪU ĐƠN</Text>
+    </View>
+
+    <View style={styles.formsGrid}>
+      {formsData.map((form) => (
+        <TouchableOpacity key={form.id} style={styles.formCard}>
+          <Text style={styles.formIcon}>{form.icon}</Text>
+          <Text style={styles.formName}>{form.name}</Text>
+          <Text style={styles.formAction}>Tải về →</Text>
+        </TouchableOpacity>
+      ))}
+    </View>
+  </ScrollView>
+);
+
+// ============ DECISIONS SCREEN ============
+const decisionsData = [
+  { id: '1', title: 'Quyết định công nhận sinh viên khóa 24', date: '01/09/2024', number: 'QĐ-2024-001' },
+  { id: '2', title: 'Quyết định về việc cấp học bổng HK1 2024-2025', date: '15/01/2025', number: 'QĐ-2025-012' },
+  { id: '3', title: 'Quyết định khen thưởng SV xuất sắc', date: '20/06/2025', number: 'QĐ-2025-089' },
+];
+
+const DecisionsScreen = () => (
+  <ScrollView style={styles.screenContainer}>
+    <View style={styles.headerBar}>
+      <Text style={styles.headerTitle}>📜 QUYẾT ĐỊNH SV/HV/NCS</Text>
+    </View>
+
+    {decisionsData.map((item) => (
+      <TouchableOpacity key={item.id} style={styles.decisionCard}>
+        <View style={styles.decisionIcon}>
+          <Text style={{ fontSize: 24 }}>📜</Text>
+        </View>
+        <View style={styles.decisionInfo}>
+          <Text style={styles.decisionTitle}>{item.title}</Text>
+          <Text style={styles.decisionMeta}>Số: {item.number} | {item.date}</Text>
+        </View>
+      </TouchableOpacity>
+    ))}
+  </ScrollView>
+);
 const Tab = createBottomTabNavigator();
+const AnnouncementsStack = createStackNavigator();
+
+const AnnouncementsStackNavigator = () => {
+  return (
+    <AnnouncementsStack.Navigator>
+      <AnnouncementsStack.Screen
+        name="AnnouncementsList"
+        component={AnnouncementsScreen}
+        options={{ headerShown: false }}
+      />
+      <AnnouncementsStack.Screen
+        name="AnnouncementDetail"
+        component={AnnouncementDetailScreen}
+        options={{
+          title: 'Chi tiết thông báo',
+          headerStyle: { backgroundColor: '#003366' },
+          headerTintColor: '#fff',
+          headerTitleStyle: { fontWeight: 'bold' },
+        }}
+      />
+    </AnnouncementsStack.Navigator>
+  );
+};
 
 const TabNavigator = ({ route }: any) => {
   const user = route.params?.user;
@@ -278,11 +1004,20 @@ const TabNavigator = ({ route }: any) => {
         tabBarActiveTintColor: '#003366',
         tabBarInactiveTintColor: '#999',
         tabBarStyle: { paddingBottom: 5, height: 60 },
-        tabBarLabelStyle: { fontSize: 11 },
+        tabBarLabelStyle: { fontSize: 10 },
       }}>
       <Tab.Screen
+        name="Trang chủ"
+        options={{
+          headerShown: false,
+          tabBarLabel: 'Trang chủ',
+          tabBarIcon: () => <Text style={{ fontSize: 20 }}>🏠</Text>,
+        }}>
+        {(props) => <DashboardScreen {...props} route={{ ...props.route, params: { user } }} />}
+      </Tab.Screen>
+      <Tab.Screen
         name="Thông báo"
-        component={AnnouncementsScreen}
+        component={AnnouncementsStackNavigator}
         options={{
           headerShown: false,
           tabBarLabel: 'Thông báo',
@@ -299,6 +1034,15 @@ const TabNavigator = ({ route }: any) => {
         }}
       />
       <Tab.Screen
+        name="Lịch thi"
+        component={ExamScheduleScreen}
+        options={{
+          headerShown: false,
+          tabBarLabel: 'Lịch thi',
+          tabBarIcon: () => <Text style={{ fontSize: 20 }}>📝</Text>,
+        }}
+      />
+      <Tab.Screen
         name="Xem điểm"
         component={GradesScreen}
         options={{
@@ -307,16 +1051,38 @@ const TabNavigator = ({ route }: any) => {
           tabBarIcon: () => <Text style={{ fontSize: 20 }}>📊</Text>,
         }}
       />
-      <Tab.Screen
-        name="Cá nhân"
-        options={{
-          headerShown: false,
-          tabBarLabel: 'Cá nhân',
-          tabBarIcon: () => <Text style={{ fontSize: 20 }}>👤</Text>,
-        }}>
-        {(props) => <ProfileScreen {...props} route={{ ...props.route, params: { user } }} />}
-      </Tab.Screen>
     </Tab.Navigator>
+  );
+};
+
+// ============ MORE SCREENS NAVIGATOR ============
+const MoreNavigator = ({ route }: any) => {
+  const user = route.params?.user;
+
+  return (
+    <ScrollView style={styles.screenContainer}>
+      <View style={styles.headerBar}>
+        <Text style={styles.headerTitle}>📋 CHỨC NĂNG KHÁC</Text>
+      </View>
+      <View style={styles.moreMenuGrid}>
+        <TouchableOpacity style={styles.moreMenuItem}>
+          <Text style={styles.moreMenuIcon}>👤</Text>
+          <Text style={styles.moreMenuText}>Thông tin cá nhân</Text>
+        </TouchableOpacity>
+        <TouchableOpacity style={styles.moreMenuItem}>
+          <Text style={styles.moreMenuIcon}>💰</Text>
+          <Text style={styles.moreMenuText}>Học phí</Text>
+        </TouchableOpacity>
+        <TouchableOpacity style={styles.moreMenuItem}>
+          <Text style={styles.moreMenuIcon}>🎓</Text>
+          <Text style={styles.moreMenuText}>Điểm rèn luyện</Text>
+        </TouchableOpacity>
+        <TouchableOpacity style={styles.moreMenuItem}>
+          <Text style={styles.moreMenuIcon}>📚</Text>
+          <Text style={styles.moreMenuText}>Chương trình ĐT</Text>
+        </TouchableOpacity>
+      </View>
+    </ScrollView>
   );
 };
 
@@ -330,6 +1096,17 @@ const App = () => {
         <Stack.Screen name="Splash" component={SplashScreen} />
         <Stack.Screen name="Login" component={LoginScreen} />
         <Stack.Screen name="Main" component={TabNavigator} />
+        <Stack.Screen
+          name="Profile"
+          component={ProfileScreen}
+          options={{
+            headerShown: true,
+            title: 'Thông tin cá nhân',
+            headerStyle: { backgroundColor: '#003366' },
+            headerTintColor: '#fff',
+            headerTitleStyle: { fontWeight: 'bold' },
+          }}
+        />
       </Stack.Navigator>
     </NavigationContainer>
   );
@@ -374,14 +1151,30 @@ const styles = StyleSheet.create({
   searchInput: { backgroundColor: '#fff', margin: 15, padding: 12, borderRadius: 10, borderWidth: 1, borderColor: '#e0e0e0' },
 
   // List
-  listContainer: { padding: 15 },
+  listContainer: { padding: 15, flexGrow: 1 },
+
+  // Loading
+  loadingContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 50 },
+  loadingText: { marginTop: 10, color: '#666', fontSize: 14 },
+
+  // Empty
+  emptyContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 50 },
+  emptyText: { marginTop: 10, color: '#999', fontSize: 16 },
+
+  // Error
+  errorContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 50 },
+  errorText: { marginTop: 10, color: '#e74c3c', fontSize: 16, textAlign: 'center' },
+  retryButton: { marginTop: 20, backgroundColor: '#003366', paddingHorizontal: 30, paddingVertical: 12, borderRadius: 25 },
+  retryButtonText: { color: '#fff', fontSize: 14, fontWeight: 'bold' },
 
   // Card
-  card: { backgroundColor: '#fff', borderRadius: 10, padding: 15, marginBottom: 10, elevation: 2 },
-  cardTitle: { fontSize: 14, fontWeight: '600', color: '#333', marginBottom: 8 },
-  cardMeta: { flexDirection: 'row', justifyContent: 'space-between' },
-  cardSender: { fontSize: 12, color: '#666' },
-  cardDate: { fontSize: 12, color: '#999' },
+  card: { backgroundColor: '#fff', borderRadius: 12, padding: 15, marginBottom: 12, elevation: 3, flexDirection: 'row', shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.1, shadowRadius: 4 },
+  cardIcon: { width: 50, height: 50, borderRadius: 25, backgroundColor: '#e3f2fd', justifyContent: 'center', alignItems: 'center', marginRight: 12 },
+  cardContent: { flex: 1 },
+  cardTitle: { fontSize: 14, fontWeight: '600', color: '#333', marginBottom: 8, lineHeight: 20 },
+  cardMeta: { flexDirection: 'row', justifyContent: 'space-between', flexWrap: 'wrap' },
+  cardSender: { fontSize: 11, color: '#666' },
+  cardDate: { fontSize: 11, color: '#003366', fontWeight: '500' },
 
   // Profile
   profileHeader: { backgroundColor: '#003366', alignItems: 'center', padding: 30 },
@@ -415,6 +1208,153 @@ const styles = StyleSheet.create({
   gradeScoreText: { fontSize: 18, fontWeight: 'bold', color: '#333' },
   gradeBadge: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 12, marginTop: 5 },
   gradeBadgeText: { color: '#fff', fontSize: 12, fontWeight: 'bold' },
+
+  // Exam Schedule
+  examCard: { backgroundColor: '#fff', margin: 15, marginBottom: 0, borderRadius: 12, padding: 15, elevation: 2 },
+  examHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 },
+  examSubject: { fontSize: 15, fontWeight: '600', color: '#333', flex: 1 },
+  examBadge: { backgroundColor: '#e74c3c', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 12 },
+  examBadgeText: { color: '#fff', fontSize: 11, fontWeight: 'bold' },
+  examDetails: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
+  examDetail: { fontSize: 13, color: '#666' },
+
+  // Dashboard
+  dashboardHeader: { backgroundColor: '#003366', padding: 25, paddingTop: 40 },
+  dashboardWelcome: { color: 'rgba(255,255,255,0.8)', fontSize: 16 },
+  dashboardName: { color: '#fff', fontSize: 24, fontWeight: 'bold', marginTop: 5 },
+  dashboardMssv: { color: 'rgba(255,255,255,0.7)', fontSize: 14, marginTop: 5 },
+  statsContainer: { flexDirection: 'row', margin: 15, gap: 10 },
+  statCard: { flex: 1, backgroundColor: '#fff', padding: 15, borderRadius: 12, alignItems: 'center', elevation: 2 },
+  statNumber: { fontSize: 24, fontWeight: 'bold', color: '#003366' },
+  statLabel: { fontSize: 11, color: '#666', marginTop: 5, textAlign: 'center' },
+  sectionTitle: { fontSize: 16, fontWeight: '600', color: '#333', marginHorizontal: 15, marginTop: 10, marginBottom: 10 },
+  quickLinks: { flexDirection: 'row', flexWrap: 'wrap', paddingHorizontal: 10 },
+  quickLink: { width: '25%', alignItems: 'center', padding: 10 },
+  quickLinkIcon: { fontSize: 28 },
+  quickLinkText: { fontSize: 11, color: '#666', marginTop: 5, textAlign: 'center' },
+  dashboardTopRow: { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between' },
+  logoutButton: { backgroundColor: 'rgba(255,255,255,0.2)', paddingHorizontal: 12, paddingVertical: 8, borderRadius: 20, borderWidth: 1, borderColor: 'rgba(255,255,255,0.3)' },
+  logoutButtonText: { color: '#fff', fontSize: 12, fontWeight: '600' },
+  settingsContainer: { backgroundColor: '#fff', margin: 15, borderRadius: 12, elevation: 2 },
+  settingsItem: { flexDirection: 'row', alignItems: 'center', padding: 15, borderBottomWidth: 1, borderBottomColor: '#f0f0f0' },
+  settingsIcon: { fontSize: 20, marginRight: 15 },
+  settingsText: { flex: 1, fontSize: 15, color: '#333' },
+  settingsArrow: { fontSize: 20, color: '#ccc' },
+
+  // Tuition
+  tuitionCard: { backgroundColor: '#fff', margin: 15, marginBottom: 0, borderRadius: 12, padding: 15, elevation: 2 },
+  tuitionSemester: { fontSize: 15, fontWeight: '600', color: '#003366', marginBottom: 15 },
+  tuitionRow: { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 8 },
+  tuitionLabel: { fontSize: 14, color: '#666' },
+  tuitionValue: { fontSize: 14, color: '#333' },
+  tuitionLabelBold: { fontSize: 14, color: '#333', fontWeight: '600' },
+  tuitionValueBold: { fontSize: 16, color: '#003366', fontWeight: 'bold' },
+  tuitionDivider: { height: 1, backgroundColor: '#e0e0e0', marginVertical: 10 },
+  tuitionStatus: { padding: 12, borderRadius: 8, alignItems: 'center', marginTop: 10 },
+  tuitionStatusText: { color: '#fff', fontSize: 14, fontWeight: 'bold' },
+
+  // Training Points
+  trainingAvg: { backgroundColor: '#003366', margin: 15, padding: 20, borderRadius: 12, alignItems: 'center' },
+  trainingAvgLabel: { color: 'rgba(255,255,255,0.8)', fontSize: 14 },
+  trainingAvgValue: { color: '#fff', fontSize: 36, fontWeight: 'bold', marginTop: 5 },
+  trainingAvgRank: { color: '#4CAF50', fontSize: 14, fontWeight: '600', marginTop: 5 },
+  trainingCard: { flexDirection: 'row', backgroundColor: '#fff', margin: 15, marginTop: 0, borderRadius: 12, padding: 15, elevation: 2, alignItems: 'center' },
+  trainingInfo: { flex: 1 },
+  trainingSemester: { fontSize: 14, fontWeight: '600', color: '#333' },
+  trainingRank: { fontSize: 12, color: '#4CAF50', marginTop: 4 },
+  trainingScore: { flexDirection: 'row', alignItems: 'baseline' },
+  trainingPoints: { fontSize: 24, fontWeight: 'bold', color: '#003366' },
+  trainingMax: { fontSize: 14, color: '#999' },
+
+  // Curriculum
+  curriculumSummary: { backgroundColor: '#003366', margin: 15, padding: 20, borderRadius: 12 },
+  curriculumTotal: { color: '#fff', fontSize: 14, textAlign: 'center' },
+  progressBar: { height: 10, backgroundColor: 'rgba(255,255,255,0.3)', borderRadius: 5, marginTop: 10 },
+  progressFill: { height: '100%', backgroundColor: '#4CAF50', borderRadius: 5 },
+  curriculumPercent: { color: 'rgba(255,255,255,0.8)', fontSize: 12, textAlign: 'center', marginTop: 8 },
+  curriculumCard: { backgroundColor: '#fff', margin: 15, marginTop: 0, borderRadius: 12, padding: 15, elevation: 2 },
+  curriculumHeader: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 10 },
+  curriculumSemester: { fontSize: 15, fontWeight: '600', color: '#003366' },
+  curriculumCredits: { fontSize: 13, color: '#4CAF50', fontWeight: '600' },
+  curriculumSubject: { fontSize: 13, color: '#666', paddingVertical: 4 },
+
+  // More Menu
+  moreMenuGrid: { flexDirection: 'row', flexWrap: 'wrap', padding: 10 },
+  moreMenuItem: { width: '50%', padding: 10 },
+  moreMenuItemInner: { backgroundColor: '#fff', borderRadius: 12, padding: 20, alignItems: 'center', elevation: 2 },
+  moreMenuIcon: { fontSize: 32 },
+  moreMenuText: { fontSize: 12, color: '#666', marginTop: 8, textAlign: 'center' },
+
+  // Attendance
+  attendanceCard: { backgroundColor: '#fff', margin: 15, marginBottom: 0, borderRadius: 12, padding: 15, elevation: 2 },
+  attendanceSubject: { fontSize: 15, fontWeight: '600', color: '#333', marginBottom: 10 },
+  attendanceStats: { flexDirection: 'row', justifyContent: 'space-around', marginBottom: 10 },
+  attendanceStat: { alignItems: 'center' },
+  attendanceNumber: { fontSize: 20, fontWeight: 'bold', color: '#003366' },
+  attendanceLabel: { fontSize: 11, color: '#666' },
+  attendanceProgress: { height: 6, backgroundColor: '#e0e0e0', borderRadius: 3 },
+  attendanceProgressFill: { height: '100%', backgroundColor: '#4CAF50', borderRadius: 3 },
+
+  // English Grades
+  englishSummary: { backgroundColor: '#003366', margin: 15, padding: 20, borderRadius: 12, alignItems: 'center' },
+  englishSummaryLabel: { color: 'rgba(255,255,255,0.8)', fontSize: 14 },
+  englishSummaryValue: { color: '#fff', fontSize: 24, fontWeight: 'bold', marginTop: 5 },
+  englishSummaryStatus: { color: '#4CAF50', fontSize: 14, marginTop: 5 },
+  englishCard: { flexDirection: 'row', backgroundColor: '#fff', margin: 15, marginTop: 0, borderRadius: 12, padding: 15, elevation: 2 },
+  englishInfo: { flex: 1 },
+  englishType: { fontSize: 15, fontWeight: '600', color: '#333' },
+  englishDate: { fontSize: 12, color: '#666', marginTop: 4 },
+  englishScore: { alignItems: 'flex-end' },
+  englishScoreText: { fontSize: 20, fontWeight: 'bold', color: '#003366' },
+  englishStatus: { fontSize: 11, color: '#4CAF50', marginTop: 4 },
+
+  // Course Registration
+  regInfo: { flexDirection: 'row', justifyContent: 'space-between', padding: 15, backgroundColor: '#fff' },
+  regInfoText: { fontSize: 13, color: '#666' },
+  courseCard: { flexDirection: 'row', backgroundColor: '#fff', margin: 15, marginTop: 0, borderRadius: 12, padding: 15, elevation: 2, alignItems: 'center' },
+  courseCardSelected: { backgroundColor: '#e3f2fd', borderColor: '#003366', borderWidth: 2 },
+  courseCheckbox: { marginRight: 10 },
+  courseInfo: { flex: 1 },
+  courseCode: { fontSize: 12, color: '#003366', fontWeight: '600' },
+  courseName: { fontSize: 14, fontWeight: '600', color: '#333', marginTop: 2 },
+  courseDetails: { fontSize: 11, color: '#666', marginTop: 4 },
+  courseStatus: { paddingHorizontal: 8, paddingVertical: 4, borderRadius: 10 },
+  courseStatusText: { color: '#fff', fontSize: 10, fontWeight: 'bold' },
+  regButton: { backgroundColor: '#003366', margin: 15, padding: 15, borderRadius: 10, alignItems: 'center' },
+  regButtonText: { color: '#fff', fontSize: 16, fontWeight: 'bold' },
+
+  // Graduation
+  gradStatus: { backgroundColor: '#003366', margin: 15, padding: 25, borderRadius: 12, alignItems: 'center' },
+  gradStatusTitle: { color: 'rgba(255,255,255,0.8)', fontSize: 14, marginTop: 10 },
+  gradStatusValue: { color: '#FFC107', fontSize: 16, fontWeight: 'bold', marginTop: 5 },
+  gradChecklist: { backgroundColor: '#fff', margin: 15, marginTop: 0, borderRadius: 12, padding: 15, elevation: 2 },
+  gradChecklistTitle: { fontSize: 15, fontWeight: '600', color: '#333', marginBottom: 15 },
+  gradCheckItem: { flexDirection: 'row', alignItems: 'center', paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: '#f0f0f0' },
+  gradCheckText: { fontSize: 14, color: '#333', marginLeft: 10, flex: 1 },
+
+  // Forms
+  formsGrid: { flexDirection: 'row', flexWrap: 'wrap', padding: 10 },
+  formCard: { width: '50%', padding: 5 },
+  formCardInner: { backgroundColor: '#fff', borderRadius: 12, padding: 15, alignItems: 'center', elevation: 2 },
+  formIcon: { fontSize: 32 },
+  formName: { fontSize: 12, color: '#333', textAlign: 'center', marginTop: 8 },
+  formAction: { fontSize: 11, color: '#003366', marginTop: 5 },
+
+  // Decisions
+  decisionCard: { flexDirection: 'row', backgroundColor: '#fff', margin: 15, marginTop: 0, borderRadius: 12, padding: 15, elevation: 2 },
+  decisionIcon: { width: 50, height: 50, borderRadius: 25, backgroundColor: '#e3f2fd', justifyContent: 'center', alignItems: 'center', marginRight: 12 },
+  decisionInfo: { flex: 1 },
+  decisionTitle: { fontSize: 14, fontWeight: '600', color: '#333' },
+  decisionMeta: { fontSize: 12, color: '#666', marginTop: 4 },
+
+  // Announcement Detail
+  detailHeader: { backgroundColor: '#fff', padding: 20, borderBottomWidth: 1, borderBottomColor: '#e0e0e0' },
+  detailTitle: { fontSize: 18, fontWeight: 'bold', color: '#333', lineHeight: 26, marginBottom: 15 },
+  detailMeta: { borderTopWidth: 1, borderTopColor: '#f0f0f0', paddingTop: 15 },
+  detailMetaItem: { fontSize: 14, color: '#666', marginBottom: 8 },
+  detailContent: { backgroundColor: '#fff', margin: 15, padding: 20, borderRadius: 12, elevation: 3 },
+  detailContentLabel: { fontSize: 14, fontWeight: 'bold', color: '#003366', marginBottom: 10 },
+  detailContentText: { fontSize: 15, color: '#333', lineHeight: 24 },
 });
 
 export default App;
