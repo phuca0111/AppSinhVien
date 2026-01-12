@@ -1,0 +1,23 @@
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  background-color: #f5f7fa;
+  color: #333;
+}
+
+:root {
+  --primary: #003366;
+  --primary-dark: #002244;
+  --secondary: #4CAF50;
+  --danger: #e74c3c;
+  --warning: #f39c12;
+  --bg-light: #f5f7fa;
+  --white: #fff;
+  --gray: #666;
+  --border: #e0e0e0;
+}
