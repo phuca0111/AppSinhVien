@@ -27,6 +27,30 @@ function Layout({ children, onLogout }) {
                             Sinh viên
                         </NavLink>
                     </li>
+                    <li>
+                        <NavLink to="/schedules" className={({ isActive }) => isActive ? 'active' : ''}>
+                            <span className="icon">📅</span>
+                            Lịch học
+                        </NavLink>
+                    </li>
+                    <li>
+                        <NavLink to="/exam-schedules" className={({ isActive }) => isActive ? 'active' : ''}>
+                            <span className="icon">📝</span>
+                            Lịch thi
+                        </NavLink>
+                    </li>
+                    <li>
+                        <NavLink to="/subjects" className={({ isActive }) => isActive ? 'active' : ''}>
+                            <span className="icon">📚</span>
+                            Môn học
+                        </NavLink>
+                    </li>
+                    <li>
+                        <NavLink to="/grades" className={({ isActive }) => isActive ? 'active' : ''}>
+                            <span className="icon">🏆</span>
+                            Quản lý Điểm
+                        </NavLink>
+                    </li>
                 </ul>
                 <button className="logout-btn" onClick={onLogout}>
                     🚪 Đăng xuất
