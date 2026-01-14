@@ -14,7 +14,8 @@ function Students() {
         ho_ten: '',
         lop: '',
         khoa: 'Công nghệ Thông tin',
-        email: ''
+        email: '',
+        registered_sections: ''
     })
 
     useEffect(() => {
@@ -33,7 +34,8 @@ function Students() {
             ho_ten: '',
             lop: '',
             khoa: 'Công nghệ Thông tin',
-            email: ''
+            email: '',
+            registered_sections: ''
         })
         setShowModal(true)
     }
@@ -46,7 +48,8 @@ function Students() {
             ho_ten: student.ho_ten,
             lop: student.lop,
             khoa: student.khoa,
-            email: student.email
+            email: student.email,
+            registered_sections: student.registered_sections || ''
         })
         setShowModal(true)
     }
@@ -114,7 +117,6 @@ function Students() {
                                 <th>Họ và tên</th>
                                 <th>Lớp</th>
                                 <th>Khoa</th>
-                                <th>Email</th>
                                 <th>Thao tác</th>
                             </tr>
                         </thead>
@@ -125,7 +127,6 @@ function Students() {
                                     <td>{student.ho_ten}</td>
                                     <td>{student.lop}</td>
                                     <td>{student.khoa}</td>
-                                    <td>{student.email}</td>
                                     <td>
                                         <div className="actions">
                                             <button className="btn btn-sm btn-primary" onClick={() => setSelectedStudent(student)} title="Xem">👁️</button>
@@ -163,7 +164,8 @@ function Students() {
                             <div style={{ background: '#f8f9fa', padding: '15px', borderRadius: '8px' }}>
                                 <p style={{ marginBottom: '10px' }}><strong>Lớp:</strong> {selectedStudent.lop}</p>
                                 <p style={{ marginBottom: '10px' }}><strong>Khoa:</strong> {selectedStudent.khoa}</p>
-                                <p><strong>Email:</strong> {selectedStudent.email}</p>
+                                <p style={{ marginBottom: '10px' }}><strong>Email:</strong> {selectedStudent.email}</p>
+                                <p><strong>Lớp học phần:</strong> {selectedStudent.registered_sections}</p>
                             </div>
                         </div>
                         <div className="modal-footer">
@@ -211,8 +213,11 @@ function Students() {
                                     </select>
                                 </div>
                                 <div className="form-group">
-                                    <label>Email</label>
                                     <input type="email" value={formData.email} onChange={(e) => setFormData({ ...formData, email: e.target.value })} placeholder="Tự động tạo từ MSSV" />
+                                </div>
+                                <div className="form-group">
+                                    <label>Các lớp học phần (phân cách dấu phẩy)</label>
+                                    <input type="text" value={formData.registered_sections} onChange={(e) => setFormData({ ...formData, registered_sections: e.target.value })} placeholder="VD: MATH_01, ENG_02" />
                                 </div>
                             </div>
                             <div className="modal-footer">
